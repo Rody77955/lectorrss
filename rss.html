@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor RSS de Inteligencia Artificial</title>
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        #news-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .news-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .news-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .news-source {
+            font-size: 0.8em;
+            color: var(--primary);
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .news-title {
+            font-size: 1.1em;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+        }
+
+        .news-desc {
+            font-size: 0.9em;
+            color: #4b5563;
+            margin-bottom: 15px;
+            /* Limita el texto a 3 líneas */
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .read-more {
+            margin-top: 10px;
+            text-decoration: none;
+            background-color: var(--primary);
+            color: white;
+            text-align: center;
+            padding: 8px;
+            border-radius: 5px;
+            font-weight: 500;
+            display: block;
+        }
+
+        .read-more:hover {
+            background-color: #3730a3;
+        }
+
+        .loading {
+            text-align: center;
+            grid-column: 1 / -1;
+            padding: 40px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>📰 Lector RSS de Inteligencia Artificial</h1>
+        <div class="subtitle">Fuentes seleccionadas (Xataka, TechCrunch y más)</div>
+    </header>
+
+    <div id="news-container">
+        <div class="loading">Cargando fuentes RSS...</div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURACIÓN DE FUENTES RSS ---
+        // Lista de feeds de IA (puedes añadir o quitar los que quieras)
+        const FEEDS = [
+            // Fuente en español (recomendada)
+            { name: "Xataka IA", url: "https://www.xataka.com/tag/inteligencia-artificial/rss2.xml" },
+            // Fuentes en inglés (esenciales para lo último en IA)
+            { name: "MIT Tech Review AI", url: "https://www.technologyreview.com/topic/artificial-intelligence/feed/" },
+            { name: "TechCrunch AI", url: "https://techcrunch.com/category/artificial-intelligence/feed/" },
+            { name: "Genbeta Dev", url: "https://www.genbeta.com/tag/ia-generativa/rss2.xml" }
+        ];
+
+        // Proxy para evitar problemas CORS. Este servicio convierte RSS a JSON.
+        const PROXY_URL = 'https://api.rss2json.com/v1/api.json?rss_url=';
+        
+        // Contenedor principal
+        const container = document.getElementById('news-container');
+
+        async function fetchFeeds() {
+            container.innerHTML = ''; // Limpiar mensaje de carga
+
+            for (const feed of FEEDS) {
+                const finalUrl = `${PROXY_URL}${encodeURIComponent(feed.url)}`;
+                
+                try {
+                    const response = await fetch(finalUrl);
+                    const data = await response.json();
+                    
+                    if (data.status === 'ok' && data.items) {
+                        renderNews(data.items, feed.name);
+                    } else {
+                        console.error(`Error al procesar el feed de ${feed.name}:`, data);
+                    }
+
+                } catch (error) {
+                    console.error(`Error al conectar con el feed de ${feed.name}:`, error);
+                }
+            }
+            
+            if (container.innerHTML === '') {
+                 container.innerHTML = '<div class="loading">No se pudieron cargar las noticias de ninguna fuente.</div>';
+            }
+        }
+
+        function renderNews(items, sourceName) {
+            items.slice(0, 5).forEach(item => { // Mostrar solo 5 artículos por fuente para variedad
+                const card = document.createElement('div');
+                card.className = 'news-card';
+                
+                // Formatear la fecha
+                const date = new Date(item.pubDate);
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                // Limpiar HTML de la descripción (simple remoción de tags para que se vea limpio)
+                const descriptionClean = item.description.replace(/<[^>]*>/g, '').trim();
+
+                card.innerHTML = `
+                    <span class="news-source">${sourceName} • ${timeStr}</span>
+                    <h2 class="news-title">${item.title}</h2>
+                    <p class="news-desc">${descriptionClean || 'Sin descripción disponible.'}</p>
+                    <a href="${item.link}" target="_blank" class="read-more">Leer Noticia</a>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // Ejecutar al cargar
+        fetchFeeds();
+    </script>
+</body>
+</html>
